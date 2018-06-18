@@ -1,0 +1,47 @@
+import express from 'express';
+import bodyParser from 'body-parser';
+import { graphqlExpress, graphiqlExpress } from 'apollo-server-express';
+import { makeExecutableSchema } from 'graphql-tools';
+import path from 'path';
+import { fileLoader, mergeTypes, mergeResolvers } from 'merge-graphql-schemas';
+import cors from 'cors';
+
+import models from './models'
+
+const PORT = 8082;
+
+const app = express();
+
+app.use(cors('*'));
+
+const typesArray = fileLoader(path.join(__dirname, './schema'));
+
+const typeDefs = mergeTypes(typesArray);
+
+const resolversArray = fileLoader(path.join(__dirname, './resolvers'));
+
+const resolvers = mergeResolvers(resolversArray);
+
+export const schema = makeExecutableSchema({
+  typeDefs,
+  resolvers
+})
+
+const graphqlEndpoint = '/graphql';
+
+// bodyParser is needed just for POST.
+app.use(graphqlEndpoint, bodyParser.json(), graphqlExpress({
+  schema,
+  context: {
+    models,
+    user: {
+      id: 1, 
+    }
+  }
+}));
+
+app.use('/graphiql', graphiqlExpress({ endpointURL: graphqlEndpoint }));
+
+models.sequelize.sync().then(() => {
+  app.listen(PORT);
+})
